@@ -51,11 +51,16 @@ const {
   CLOUDFLARE_SECRET_ACCESS_KEY,
   CLOUDFLARE_BUCKETNAME,
   CLOUDFLARE_BUCKET_URL,
+  CLOUDFLARE_ENDPOINT,
+  CLOUDFLARE_REGION,
 } = process.env;
 
 const R2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  region: (CLOUDFLARE_ENDPOINT && CLOUDFLARE_REGION) || 'auto',
+  endpoint:
+    CLOUDFLARE_ENDPOINT ||
+    `https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  ...(CLOUDFLARE_ENDPOINT ? { forcePathStyle: true } : {}),
   credentials: {
     accessKeyId: CLOUDFLARE_ACCESS_KEY!,
     secretAccessKey: CLOUDFLARE_SECRET_ACCESS_KEY!,

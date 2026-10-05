@@ -44,10 +44,13 @@ class CloudflareStorage implements IUploadProvider {
     secretKey: string,
     private region: string,
     private _bucketName: string,
-    private _uploadUrl: string
+    private _uploadUrl: string,
+    customEndpoint?: string
   ) {
     this._client = new S3Client({
-      endpoint: `https://${accountID}.r2.cloudflarestorage.com`,
+      endpoint:
+        customEndpoint || `https://${accountID}.r2.cloudflarestorage.com`,
+      ...(customEndpoint ? { forcePathStyle: true } : {}),
       region,
       credentials: {
         accessKeyId: accessKey,

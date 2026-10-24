@@ -1,0 +1,17 @@
+# Trivy secret allowlist. Board decision (Chinmay, 24 Oct 2026 11:17 IST), HYBA-1448.
+# Exactly 3 entries, rule gcp-service-account only, exact paths, no globs. Do not widen:
+# any other finding must fail the gate and go back to the board.
+# scripts/ci/tests/test-trivy-secret-gate.sh checks this file and the pinned hashes.
+secrets:
+  - id: gcp-service-account
+    paths:
+      - "root/.local/share/pnpm/store/v10/files/0b/0d3d3adf93e8ba3aade330daf0f7e7f1b0321fb99d8dac9cd16254168313bfd73690b384dec46ca4189bcd07a7ff7256e5e29b093ad09be7b0c572542d8a07"
+    statement: "pnpm store file holding the README.md of the npm package google-auth-library 9.15.1 (sha512 0b0d3d3adf93e8ba3aade330daf0f7e7f1b0321fb99d8dac9cd16254168313bfd73690b384dec46ca4189bcd07a7ff7256e5e29b093ad09be7b0c572542d8a07); example service-account JSON at line 319 with placeholder values, not a real key. Upstream npm documentation. Board decision 24 Oct 2026 11:17 IST. Ticket HYBA-1448."
+  - id: gcp-service-account
+    paths:
+      - "root/.local/share/pnpm/store/v10/files/4a/2f93d31eb7c819f5fa8aad0f982e67ef6abc0f2c6dd0954d261c1f248c758edb43c20918d798acf801b93f69979f48a892893b0bea87b2fe867e6525f93c95"
+    statement: "pnpm store file holding the README.md of the npm package google-auth-library 10.9.1 (sha512 4a2f93d31eb7c819f5fa8aad0f982e67ef6abc0f2c6dd0954d261c1f248c758edb43c20918d798acf801b93f69979f48a892893b0bea87b2fe867e6525f93c95); example service-account JSON at line 306 with placeholder values, not a real key. Upstream npm documentation. Board decision 24 Oct 2026 11:17 IST. Ticket HYBA-1448."
+  - id: gcp-service-account
+    paths:
+      - "root/.local/share/pnpm/store/v10/files/40/f66016ceb0cd44d99104682874aebcea3ca3474b48c8b219a3350220035f8cb647181460fd1882b37a9ba1d67e3c70e81ff689aa9cceb206a65ca4bcf91a8a"
+    statement: "pnpm store file holding the README.md of the npm package google-auth-library 8.9.0 (sha512 40f66016ceb0cd44d99104682874aebcea3ca3474b48c8b219a3350220035f8cb647181460fd1882b37a9ba1d67e3c70e81ff689aa9cceb206a65ca4bcf91a8a); example service-account JSON at line 310 with placeholder values, not a real key. Upstream npm documentation. Board decision 24 Oct 2026 11:17 IST. Ticket HYBA-1448."

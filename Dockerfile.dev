@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
 && rm -rf /var/lib/apt/lists/*
 
-RUN npm --no-update-notifier --no-fund --global install pnpm@10.6.1
+RUN npm --no-update-notifier --no-fund --global install pnpm@10.34.9
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ RUN addgroup --system www \
  && mkdir -p /www \
  && chown -R www:www /www /var/lib/nginx
 
-RUN npm --no-update-notifier --no-fund --global install pnpm@10.6.1 pm2
+RUN npm --no-update-notifier --no-fund --global install pnpm@10.34.9 pm2
 
 WORKDIR /app
 

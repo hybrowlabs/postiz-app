@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PendingCheckResponse,
@@ -185,9 +186,9 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   }
 
   private async uploadFileToReddit(accessToken: string, path: string) {
-    const mimeType = lookup(path);
+    const mimeType = lookup(mediaFilePath(path));
     const formData = new FormData();
-    formData.append('filepath', path.split('/').pop());
+    formData.append('filepath', mediaFilePath(path).split('/').pop());
     formData.append('mimetype', mimeType || 'application/octet-stream');
 
     const {
@@ -222,7 +223,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     );
 
     upload.append('file', stream, {
-      filename: path.split('/').pop(),
+      filename: mediaFilePath(path).split('/').pop(),
       contentType: (mimeType as string) || 'application/octet-stream',
       knownLength: fileSize,
     });

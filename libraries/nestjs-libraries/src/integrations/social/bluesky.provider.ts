@@ -1,3 +1,5 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
+import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import {
   AuthTokenDetails,
   PendingCheckResponse,
@@ -88,7 +90,7 @@ async function startVideoUpload(
   // The video is never buffered in memory: the size comes from a HEAD request
   // and the bytes are streamed straight from the source into the upload.
   setHeartbeatDetails('bluesky: video size');
-  const headResponse = await fetch(videoPath, {
+  const headResponse = await fetchMediaMetadata(videoPath, {
     method: 'HEAD',
     // identity encoding so content-length matches the bytes the GET streams
     headers: { 'accept-encoding': 'identity' },
@@ -121,7 +123,7 @@ async function startVideoUpload(
     'https://video.bsky.app/xrpc/app.bsky.video.uploadVideo'
   );
   uploadUrl.searchParams.append('did', agent.session!.did);
-  uploadUrl.searchParams.append('name', videoPath.split('/').pop()!);
+  uploadUrl.searchParams.append('name', mediaFilePath(videoPath).split('/').pop()!);
 
   setHeartbeatDetails('bluesky: upload video');
   const uploadResponse = await fetch(uploadUrl, {

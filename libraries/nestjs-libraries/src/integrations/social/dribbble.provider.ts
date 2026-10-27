@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AnalyticsData,
   AuthTokenDetails,
@@ -170,7 +171,7 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
       }
     );
 
-    const slash = postDetails?.[0]?.media?.[0]?.path.split('/').at(-1);
+    const slash = mediaFilePath(postDetails?.[0]?.media?.[0]?.path || '').split('/').at(-1);
 
     const formData = new FormData();
     formData.append('image', data, {

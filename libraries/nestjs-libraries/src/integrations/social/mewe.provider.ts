@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -207,7 +208,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
   ): Promise<string> {
     const mediaResponse = await fetch(mediaPath);
     const blob = await mediaResponse.blob();
-    const fileName = mediaPath.split('/').pop() || 'photo.jpg';
+    const fileName = mediaFilePath(mediaPath).split('/').pop() || 'photo.jpg';
 
     const form = new FormData();
     form.append('file', blob, fileName);

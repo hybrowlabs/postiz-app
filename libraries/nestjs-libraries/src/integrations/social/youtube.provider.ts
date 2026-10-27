@@ -1,3 +1,4 @@
+import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import {
   AnalyticsData,
   AuthTokenDetails,
@@ -435,7 +436,7 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       // so content-length matches the bytes a later GET actually streams
       // (fetch transparently decompresses encoded bodies).
       setHeartbeatDetails(`youtube: media size ${stripQuery(path)}`);
-      const head = await fetch(path, {
+      const head = await fetchMediaMetadata(path, {
         method: 'HEAD',
         headers: { 'accept-encoding': 'identity' },
         dispatcher: getSsrfSafeDispatcher(),

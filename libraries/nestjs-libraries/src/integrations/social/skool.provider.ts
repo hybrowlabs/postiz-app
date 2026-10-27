@@ -1,3 +1,5 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
+import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { BadBody, SocialAbstract } from '../social.abstract';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
@@ -209,7 +211,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
     for (const item of media) {
       // Size and type come from a HEAD request; the PUT below streams the
       // bytes so the file is never buffered in memory.
-      const headResponse = await fetch(item.path, {
+      const headResponse = await fetchMediaMetadata(item.path, {
         method: 'HEAD',
         // identity encoding so content-length matches the bytes the GET streams
         headers: { 'accept-encoding': 'identity' },
@@ -230,7 +232,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
           'Could not determine the media size for upload'
         );
       }
-      const fileName = item.path.split('/').pop() || 'file';
+      const fileName = mediaFilePath(item.path).split('/').pop() || 'file';
 
       const createFileResponse = await (
         await this.fetch('https://api2.skool.com/files', {

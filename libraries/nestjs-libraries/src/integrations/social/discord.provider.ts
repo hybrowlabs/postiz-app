@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -156,7 +157,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
           attachments: media?.map((p, index) => ({
             id: index,
             description: `Picture ${index}`,
-            filename: p.path.split('/').pop(),
+            filename: mediaFilePath(p.path).split('/').pop(),
           })),
         })
       );
@@ -166,7 +167,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         const fileSize = await this.mediaSize(item.path, this.identifier);
         const stream = await this.mediaStream(item.path, this.identifier);
         form.append(`files[${index}]`, stream, {
-          filename: item.path.split('/').pop(),
+          filename: mediaFilePath(item.path).split('/').pop(),
           knownLength: fileSize,
         });
         index++;

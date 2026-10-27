@@ -1,3 +1,5 @@
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { privateMediaEnabled, canonicalMediaUrl } from './private.media';
 import {
   UploadPartCommand,
   S3Client,
@@ -11,6 +13,10 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Request, Response } from 'express';
+
+interface UploadRequest extends Request {
+  org?: { id: string };
+}
 import crypto from 'crypto';
 import path from 'path';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -74,9 +80,35 @@ function generateRandomString() {
 
 export default async function handleR2Upload(
   endpoint: string,
-  req: Request,
-  res: Response
+  req: UploadRequest,
+  res: Response,
 ) {
+  if (privateMediaEnabled() && !req.org?.id) {
+    return res.status(403).json({ message: 'Organization authentication required' });
+  }
+  if (privateMediaEnabled() && endpoint !== 'create-multipart-upload') {
+    const body = req.body || {};
+    const partData = body.partData;
+    if (partData && ['key', 'uploadId'].some(
+      (field) => body[field] !== undefined && partData[field] !== undefined &&
+        body[field] !== partData[field],
+    )) {
+      return res.status(400).json({ message: 'Conflicting multipart identifiers' });
+    }
+    // Authorize exactly the fields consumed by the selected handler.
+    const { key, uploadId } =
+      (endpoint === 'prepare-upload-parts' ? partData : body) || {};
+    if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(key) ||
+        typeof uploadId !== 'string' || !uploadId) {
+      return res.status(400).json({ message: 'Invalid multipart identifiers' });
+    }
+    const owner = await ioRedis.get(`privateUpload:${key}:${uploadId}`);
+    if (!req.org?.id || owner !== req.org.id) {
+      return res
+        .status(403)
+        .json({ message: 'Upload does not belong to this organization' });
+    }
+  }
   switch (endpoint) {
     case 'create-multipart-upload':
       return createMultipartUpload(req, res);
@@ -117,10 +149,12 @@ export async function simpleUpload(
   const command = new PutObjectCommand({ ...params });
   await R2.send(command);
 
-  return CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
+  return privateMediaEnabled()
+    ? canonicalMediaUrl(randomFilename)
+    : CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
 }
 
-export async function createMultipartUpload(req: Request, res: Response) {
+export async function createMultipartUpload(req: UploadRequest, res: Response) {
   const { file, fileHash } = req.body;
   const safeExt = normalizeExtension(file?.name || '');
   if (!safeExt) {
@@ -141,6 +175,14 @@ export async function createMultipartUpload(req: Request, res: Response) {
 
     const command = new CreateMultipartUploadCommand({ ...params });
     const response = await R2.send(command);
+    if (privateMediaEnabled()) {
+      await ioRedis.set(
+        `privateUpload:${response.Key}:${response.UploadId}`,
+        req.org.id,
+        'EX',
+        86400,
+      );
+    }
     return res.status(200).json({
       uploadId: response.UploadId,
       key: response.Key,
@@ -151,7 +193,7 @@ export async function createMultipartUpload(req: Request, res: Response) {
   }
 }
 
-export async function prepareUploadParts(req: Request, res: Response) {
+export async function prepareUploadParts(req: UploadRequest, res: Response) {
   const { partData } = req.body;
 
   const parts = partData.parts;
@@ -182,7 +224,7 @@ export async function prepareUploadParts(req: Request, res: Response) {
   return res.status(200).json(response);
 }
 
-export async function listParts(req: Request, res: Response) {
+export async function listParts(req: UploadRequest, res: Response) {
   const { key, uploadId } = req.body;
 
   try {
@@ -201,7 +243,7 @@ export async function listParts(req: Request, res: Response) {
   }
 }
 
-export async function completeMultipartUpload(req: Request, res: Response) {
+export async function completeMultipartUpload(req: UploadRequest, res: Response) {
   const { key, uploadId, parts } = req.body;
 
   try {
@@ -255,10 +297,9 @@ export async function completeMultipartUpload(req: Request, res: Response) {
         .json({ message: 'File contents do not match declared type.' });
     }
 
-    response.Location =
-      process.env.CLOUDFLARE_BUCKET_URL +
-      '/' +
-      response?.Location?.split('/').at(-1);
+    response.Location = privateMediaEnabled()
+      ? canonicalMediaUrl(key)
+      : process.env.CLOUDFLARE_BUCKET_URL + '/' + response?.Location?.split('/').at(-1);
     return response;
   } catch (err) {
     console.log('Error', err);
@@ -266,7 +307,7 @@ export async function completeMultipartUpload(req: Request, res: Response) {
   }
 }
 
-export async function abortMultipartUpload(req: Request, res: Response) {
+export async function abortMultipartUpload(req: UploadRequest, res: Response) {
   const { key, uploadId } = req.body;
 
   try {
@@ -285,7 +326,7 @@ export async function abortMultipartUpload(req: Request, res: Response) {
   }
 }
 
-export async function signPart(req: Request, res: Response) {
+export async function signPart(req: UploadRequest, res: Response) {
   const { key, uploadId } = req.body;
   const partNumber = parseInt(req.body.partNumber);
 

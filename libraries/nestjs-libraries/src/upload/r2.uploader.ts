@@ -87,7 +87,21 @@ export default async function handleR2Upload(
     return res.status(403).json({ message: 'Organization authentication required' });
   }
   if (privateMediaEnabled() && endpoint !== 'create-multipart-upload') {
-    const { key, uploadId } = req.body.partData || req.body;
+    const body = req.body || {};
+    const partData = body.partData;
+    if (partData && ['key', 'uploadId'].some(
+      (field) => body[field] !== undefined && partData[field] !== undefined &&
+        body[field] !== partData[field],
+    )) {
+      return res.status(400).json({ message: 'Conflicting multipart identifiers' });
+    }
+    // Authorize exactly the fields consumed by the selected handler.
+    const { key, uploadId } =
+      (endpoint === 'prepare-upload-parts' ? partData : body) || {};
+    if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(key) ||
+        typeof uploadId !== 'string' || !uploadId) {
+      return res.status(400).json({ message: 'Invalid multipart identifiers' });
+    }
     const owner = await ioRedis.get(`privateUpload:${key}:${uploadId}`);
     if (!req.org?.id || owner !== req.org.id) {
       return res

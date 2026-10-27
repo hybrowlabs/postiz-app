@@ -155,6 +155,70 @@ describe('S3 endpoint override for cloudflare storage provider', () => {
     });
   });
 
+  describe('private multipart identifier binding', () => {
+    const endpoints = ['sign-part', 'list-parts', 'complete-multipart-upload', 'abort-multipart-upload', 'prepare-upload-parts'];
+    it.each(endpoints)('rejects conflicting nested and top-level identifiers for %s before any S3 operation', async (endpoint) => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const { ioRedis } = require('@gitroom/nestjs-libraries/redis/redis.service');
+      ioRedis.get.mockImplementation(async (key: string) => key === 'privateUpload:mine.jpg:mineUp' ? 'owner' : 'victim');
+      const uploader = require('../r2.uploader').default;
+      const { S3Client } = require('@aws-sdk/client-s3');
+      const client = S3Client.mock.results.at(-1).value;
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await uploader(endpoint, { org: { id: 'owner' }, body: {
+        partData: { key: 'mine.jpg', uploadId: 'mineUp', parts: [{ number: 1 }] },
+        key: 'victim.jpg', uploadId: 'victimUp', partNumber: 1, parts: [],
+      } }, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(client.send).not.toHaveBeenCalled();
+      expect(require('@aws-sdk/s3-request-presigner').getSignedUrl).not.toHaveBeenCalled();
+    });
+    it.each(endpoints)('denies another tenant using the actual %s handler fields', async (endpoint) => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const { ioRedis } = require('@gitroom/nestjs-libraries/redis/redis.service');
+      ioRedis.get.mockResolvedValue('victim');
+      const uploader = require('../r2.uploader').default;
+      const identifiers = { key: 'victim.jpg', uploadId: 'victimUp' };
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await uploader(endpoint, { org: { id: 'owner' }, body: endpoint === 'prepare-upload-parts' ? { partData: identifiers } : identifiers }, res);
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(ioRedis.get).toHaveBeenCalledWith('privateUpload:victim.jpg:victimUp');
+    });
+    it.each(['sign-part', 'prepare-upload-parts'])('signs only the owned authoritative fields for %s', async (endpoint) => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const { ioRedis } = require('@gitroom/nestjs-libraries/redis/redis.service');
+      ioRedis.get.mockResolvedValue('owner');
+      const uploader = require('../r2.uploader').default;
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const identifiers = { key: 'mine.jpg', uploadId: 'mineUp', partNumber: 1, parts: [{ number: 1 }] };
+      await uploader(endpoint, { org: { id: 'owner' }, body: endpoint === 'prepare-upload-parts' ? { partData: identifiers } : identifiers }, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(require('@aws-sdk/client-s3').UploadPartCommand).toHaveBeenCalledWith(expect.objectContaining({ Key: 'mine.jpg', UploadId: 'mineUp' }));
+    });
+    it('binds a newly created session to the authenticated organization', async () => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const uploader = require('../r2.uploader').default;
+      const { S3Client } = require('@aws-sdk/client-s3');
+      S3Client.mock.results.at(-1).value.send.mockResolvedValue({ Key: 'mine.jpg', UploadId: 'mineUp' });
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await uploader('create-multipart-upload', { org: { id: 'owner' }, body: { file: { name: 'photo.jpg' }, fileHash: 'hash' } }, res);
+      expect(require('@gitroom/nestjs-libraries/redis/redis.service').ioRedis.set).toHaveBeenCalledWith('privateUpload:mine.jpg:mineUp', 'owner', 'EX', 86400);
+    });
+    it('completes only the owned object and returns its canonical URL', async () => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const { ioRedis } = require('@gitroom/nestjs-libraries/redis/redis.service');
+      ioRedis.get.mockResolvedValue('owner');
+      const uploader = require('../r2.uploader').default;
+      const { S3Client, CompleteMultipartUploadCommand } = require('@aws-sdk/client-s3');
+      S3Client.mock.results.at(-1).value.send.mockResolvedValueOnce({ Location: 'https://s3.example/mine.jpg' }).mockResolvedValueOnce({ Body: [Buffer.from('jpeg')] });
+      require('file-type').fileTypeFromBuffer.mockResolvedValue({ mime: 'image/jpeg', ext: 'jpg' });
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const result = await uploader('complete-multipart-upload', { org: { id: 'owner' }, body: { key: 'mine.jpg', uploadId: 'mineUp', parts: [] } }, res);
+      expect(CompleteMultipartUploadCommand).toHaveBeenCalledWith(expect.objectContaining({ Key: 'mine.jpg', UploadId: 'mineUp' }));
+      expect(result.Location).toBe('https://media.example.com/mine.jpg');
+    });
+  });
+
   describe('r2.uploader (browser multipart path)', () => {
     it('uses the R2 endpoint when CLOUDFLARE_ENDPOINT is unset', () => {
       require('../r2.uploader');

@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { BadBody, SocialAbstract } from '../social.abstract';
@@ -231,7 +232,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
           'Could not determine the media size for upload'
         );
       }
-      const fileName = item.path.split('/').pop() || 'file';
+      const fileName = mediaFilePath(item.path).split('/').pop() || 'file';
 
       const createFileResponse = await (
         await this.fetch('https://api2.skool.com/files', {

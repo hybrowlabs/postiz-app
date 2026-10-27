@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -526,7 +527,7 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
         const fileSize = await this.mediaSize(mediaUrl, this.identifier);
         const stream = await this.mediaStream(mediaUrl, this.identifier);
         formData.append(`media-${index}`, stream, {
-          filename: item.path.split('/').pop() || `media-${index}`,
+          filename: mediaFilePath(item.path).split('/').pop() || `media-${index}`,
           contentType: mimeType,
           knownLength: fileSize,
         });

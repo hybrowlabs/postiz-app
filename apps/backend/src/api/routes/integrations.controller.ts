@@ -184,7 +184,7 @@ export class IntegrationsController {
       ? await manager.changeProfilePicture(
           integration.internalId,
           integration.token,
-          body.picture
+          await this._postService.resolvePublishingData(org.id, body.picture)
         )
       : { url: '' };
 

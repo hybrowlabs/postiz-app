@@ -1,5 +1,5 @@
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { privateMediaEnabled } from './private.media';
+import { privateMediaEnabled, canonicalMediaUrl } from './private.media';
 import {
   UploadPartCommand,
   S3Client,
@@ -133,7 +133,9 @@ export async function simpleUpload(
   const command = new PutObjectCommand({ ...params });
   await R2.send(command);
 
-  return CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
+  return privateMediaEnabled()
+    ? canonicalMediaUrl(randomFilename)
+    : CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
 }
 
 export async function createMultipartUpload(req: UploadRequest, res: Response) {
@@ -279,10 +281,9 @@ export async function completeMultipartUpload(req: UploadRequest, res: Response)
         .json({ message: 'File contents do not match declared type.' });
     }
 
-    response.Location =
-      process.env.CLOUDFLARE_BUCKET_URL +
-      '/' +
-      response?.Location?.split('/').at(-1);
+    response.Location = privateMediaEnabled()
+      ? canonicalMediaUrl(key)
+      : process.env.CLOUDFLARE_BUCKET_URL + '/' + response?.Location?.split('/').at(-1);
     return response;
   } catch (err) {
     console.log('Error', err);

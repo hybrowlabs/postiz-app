@@ -217,7 +217,9 @@ export const CreateThumbnail: FC<{
         <video
           ref={videoRef}
           src={
-            backendUrl + '/public/stream?url=' + encodeURIComponent(media.path)
+            media.path.startsWith(backendUrl.replace(/\/$/, '') + '/media/private/')
+              ? media.path
+              : backendUrl + '/public/stream?url=' + encodeURIComponent(media.path)
           }
           className="w-full h-[200px] object-contain"
           onLoadedMetadata={handleLoadedMetadata}

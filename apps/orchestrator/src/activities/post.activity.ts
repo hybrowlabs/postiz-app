@@ -244,9 +244,9 @@ export class PostActivity {
                 getIntegration.mentionFormat,
               ),
               settings: await this._postService.resolvePublishingSettings(
-          integration.organizationId,
-          p.settings,
-        ),
+                integration.organizationId,
+                p.settings,
+              ),
               media: await this._postService.updateMedia(
                 p.id,
                 JSON.parse(p.image || '[]'),
@@ -478,9 +478,9 @@ export class PostActivity {
           await getIntegration.finalizePost(
             integration.token,
             await this._postService.resolvePublishingData(
-            integration.organizationId,
-            pendingData,
-          ),
+              integration.organizationId,
+              pendingData,
+            ),
             integration,
           ),
         ),

@@ -124,6 +124,14 @@ describe('private media access', () => {
     await expect(access.forPublishing('other', persisted.pendingData)).rejects.toThrow('Media does not belong');
   });
 
+  it('normalizes legacy duplicate separators from a trailing-slash bucket base', async () => {
+    process.env.CLOUDFLARE_BUCKET_URL = base + '/';
+    expect(privateMediaKey(base + '//owned.jpeg')).toBe('owned.jpeg');
+    expect(await access.response('owner', { path: base + '//owned.jpeg' })).toEqual({ path: preview });
+    expect(await access.canonicalize('owner', { path: base + '//owned.jpeg' })).toEqual({ path });
+    await expect(access.download('other', 'owned.jpeg')).rejects.toThrow('Media not found');
+  });
+
   it('fails closed when signing fails', async () => {
     storage.signDownloadUrl.mockRejectedValue(new Error('storage unavailable'));
     await expect(access.forPublishing('owner', [{ path }])).rejects.toThrow(

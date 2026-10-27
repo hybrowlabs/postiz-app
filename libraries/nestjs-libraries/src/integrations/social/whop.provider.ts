@@ -1,3 +1,4 @@
+import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import { createHash, randomBytes } from 'crypto';
 import {
   AuthTokenDetails,
@@ -233,7 +234,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
       // The size comes from a HEAD request; the PUT below streams the bytes
       // so the file is never buffered in memory (it used to stay resident
       // through the whole ~9 minute status poll).
-      const headResponse = await fetch(item.path, {
+      const headResponse = await fetchMediaMetadata(item.path, {
         method: 'HEAD',
         // identity encoding so content-length matches the bytes the GET streams
         headers: { 'accept-encoding': 'identity' },

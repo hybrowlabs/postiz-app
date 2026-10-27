@@ -1,3 +1,4 @@
+import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Integration } from '@prisma/client';
 import {
@@ -323,7 +324,7 @@ export abstract class SocialAbstract {
       // so content-length matches the bytes a later GET actually streams
       // (fetch transparently decompresses encoded bodies).
       setHeartbeatDetails(`media size ${stripQuery(path)}`);
-      const head = await fetch(path, {
+      const head = await fetchMediaMetadata(path, {
         method: 'HEAD',
         headers: { 'accept-encoding': 'identity' },
         dispatcher: getSsrfSafeDispatcher(),

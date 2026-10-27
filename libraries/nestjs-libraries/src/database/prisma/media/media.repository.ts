@@ -4,13 +4,21 @@ import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/sa
 
 @Injectable()
 export class MediaRepository {
-  constructor(private _media: PrismaRepository<'media'>) {}
+  constructor(private _media: PrismaRepository<'media' | 'integration'>) {}
 
-  findOwnedPath(org: string, path: string) {
-    return this._media.model.media.findFirst({
+  async findOwnedPath(org: string, path: string) {
+    const media = await this._media.model.media.findFirst({
       where: { organizationId: org, OR: [{ path }, { thumbnail: path }], deletedAt: null },
       select: { id: true, path: true },
     });
+    if (media) return media;
+    // Provider avatars are uploaded directly and stored on Integration, rather
+    // than in Media. Use the same organization/deletion checks for those files.
+    const integration = await this._media.model.integration.findFirst({
+      where: { organizationId: org, picture: path, deletedAt: null },
+      select: { id: true, picture: true },
+    });
+    return integration ? { id: integration.id, path: integration.picture } : null;
   }
 
   saveFile(

@@ -240,19 +240,20 @@ export class PostActivity {
                 true,
                 false,
                 !/<\/?[a-z][\s\S]*>/i.test(p.content),
-                getIntegration.mentionFormat
+                getIntegration.mentionFormat,
               ),
               settings: JSON.parse(p.settings || '{}'),
               media: await this._postService.updateMedia(
                 p.id,
                 JSON.parse(p.image || '[]'),
-                getIntegration?.convertToJPEG || false
+                getIntegration?.convertToJPEG || false,
+                true,
               ),
-            }))
+            })),
           ),
-          integration
+          integration,
         );
-      })
+      }),
     );
   }
 
@@ -361,15 +362,16 @@ export class PostActivity {
           true,
           false,
           !/<\/?[a-z][\s\S]*>/i.test(p.content),
-          getIntegration.mentionFormat
+          getIntegration.mentionFormat,
         ),
         settings: JSON.parse(p.settings || '{}'),
         media: await this._postService.updateMedia(
           p.id,
           JSON.parse(p.image || '[]'),
-          getIntegration?.convertToJPEG || false
+          getIntegration?.convertToJPEG || false,
+          true,
         ),
-      }))
+      })),
     );
 
     setHeartbeatDetails(`${integration.providerIdentifier}: publish`);

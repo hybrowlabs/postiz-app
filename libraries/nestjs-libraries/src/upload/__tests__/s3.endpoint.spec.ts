@@ -1,3 +1,6 @@
+jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
+  ioRedis: { get: jest.fn(), set: jest.fn() },
+}));
 jest.mock('@aws-sdk/client-s3', () => ({
   S3Client: jest.fn().mockImplementation(() => ({
     middlewareStack: { add: jest.fn() },
@@ -21,18 +24,19 @@ jest.mock(
   '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator',
   () => ({
     isSafePublicHttpsUrl: jest.fn(),
-  })
+  }),
 );
 jest.mock(
   '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher',
   () => ({
     ssrfSafeDispatcher: {},
-  })
+  }),
 );
 
 const WASABI = 'https://s3.us-central-1.wasabisys.com';
 const ENV_KEYS = [
   'STORAGE_PROVIDER',
+  'STORAGE_PRIVATE',
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_ACCESS_KEY',
   'CLOUDFLARE_SECRET_ACCESS_KEY',
@@ -104,6 +108,50 @@ describe('S3 endpoint override for cloudflare storage provider', () => {
         accessKeyId: 'ak',
         secretAccessKey: 'sk',
       });
+    });
+  });
+
+  describe('private object uploads', () => {
+    it.each(['true', 'false'])(
+      'uses the expected ACL when STORAGE_PRIVATE=%s',
+      async (mode) => {
+        process.env.STORAGE_PRIVATE = mode;
+        const { fileTypeFromBuffer } = require('file-type');
+        fileTypeFromBuffer.mockResolvedValue({
+          mime: 'image/jpeg',
+          ext: 'jpg',
+        });
+        const { UploadFactory } = require('../upload.factory');
+        const { PutObjectCommand } = require('@aws-sdk/client-s3');
+        await UploadFactory.createStorage().uploadFile({
+          buffer: Buffer.from('test'),
+        });
+        expect(PutObjectCommand.mock.calls.at(-1)[0].ACL).toBe(
+          mode === 'true' ? undefined : 'public-read',
+        );
+      },
+    );
+
+    it('does not grant a multipart capability to another organization', async () => {
+      process.env.STORAGE_PRIVATE = 'true';
+      const {
+        ioRedis,
+      } = require('@gitroom/nestjs-libraries/redis/redis.service');
+      ioRedis.get.mockResolvedValue('owner');
+      const uploader = require('../r2.uploader').default;
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await uploader(
+        'sign-part',
+        {
+          org: { id: 'other' },
+          body: { key: 'owned.jpg', uploadId: 'upload1' },
+        },
+        res,
+      );
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(
+        require('@aws-sdk/s3-request-presigner').getSignedUrl,
+      ).not.toHaveBeenCalled();
     });
   });
 

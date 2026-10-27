@@ -14,6 +14,7 @@ import mime from 'mime-types';
 import { getExtension } from 'mime';
 import { IUploadProvider, UploadedStream } from './upload.interface';
 import axios from 'axios';
+import { privateMediaEnabled } from './private.media';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
@@ -139,7 +140,7 @@ class CloudflareStorage implements IUploadProvider {
       // Create the PutObjectCommand to upload the file to Cloudflare R2
       const command = new PutObjectCommand({
         Bucket: this._bucketName,
-        ACL: 'public-read',
+        ...(privateMediaEnabled() ? {} : { ACL: 'public-read' as const }),
         Key: `${id}.${extension}`,
         Body: file.buffer,
         ContentType: safeContentType,
@@ -183,7 +184,7 @@ class CloudflareStorage implements IUploadProvider {
         client: this._client,
         params: {
           Bucket: this._bucketName,
-          ACL: 'public-read',
+          ...(privateMediaEnabled() ? {} : { ACL: 'public-read' as const }),
           Key: key,
           Body: stream,
           ContentType: mimetype,
@@ -203,11 +204,17 @@ class CloudflareStorage implements IUploadProvider {
     }
   }
 
-  async signDownloadUrl(fileName: string) {
+  async signDownloadUrl(fileName: string, expiresIn = 3 * 3600) {
     return getSignedUrl(
       this._client,
-      new GetObjectCommand({ Bucket: this._bucketName, Key: fileName }),
-      { expiresIn: 3 * 3600 }
+      new GetObjectCommand({
+        Bucket: this._bucketName,
+        Key: fileName,
+        ...(privateMediaEnabled()
+          ? { ResponseCacheControl: 'private, no-store' }
+          : {}),
+      }),
+      { expiresIn },
     );
   }
 

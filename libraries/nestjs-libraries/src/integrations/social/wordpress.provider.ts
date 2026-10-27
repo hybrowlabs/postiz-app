@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -300,7 +301,7 @@ export class WordpressProvider
     if (postDetails?.[0]?.settings?.main_image?.path) {
       console.log(
         'Uploading image to WordPress',
-        postDetails[0].settings.main_image.path
+        mediaFilePath(postDetails[0].settings.main_image.path)
       );
 
       const blob = await this.fetch(
@@ -312,7 +313,7 @@ export class WordpressProvider
           method: 'POST',
           headers: {
             Authorization: `Basic ${auth}`,
-            'Content-Disposition': `attachment; filename="${postDetails[0].settings.main_image.path
+            'Content-Disposition': `attachment; filename="${mediaFilePath(postDetails[0].settings.main_image.path)
               .split('/')
               .pop()}"`,
             'Content-Type': blob.type,

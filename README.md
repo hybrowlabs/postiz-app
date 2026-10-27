@@ -206,7 +206,8 @@ Self-hosted S3/R2 installations can set `STORAGE_PRIVATE=true` with
 
 Media previews use an authenticated `/media/private/:key` endpoint that checks
 organization ownership before redirecting to a 15-minute signed GET. The backend
-and frontend must share authentication cookies for image/video requests. Responses
+must be served under the frontend origin so image/video requests carry the
+authentication cookie. Responses
 are marked `private, no-store`. Signed links are bearer capabilities until expiry;
 do not share them. Existing bucket URLs do not need a database migration.
 
@@ -214,7 +215,8 @@ Post attachments retain canonical URLs in storage. The publishing activity issue
 fresh three-hour signed URLs immediately before handing media to a social provider,
 including thumbnails and cover images in provider settings. Pending upload results
 retain canonical references; polling and finalization re-authorize and re-sign media
-for every retry. Integration avatars use the owning active integration record for
+for every retry. Size checks use a one-byte GET for private objects because S3
+GET signatures cannot authorize HEAD requests. Integration avatars use the owning active integration record for
 authorization when no Media row exists.
 API-key/OAuth API responses use 15-minute signed URLs. Public reads are not
 required. New uploads omit public ACLs; this option does not revoke ACLs or bucket

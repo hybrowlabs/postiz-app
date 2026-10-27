@@ -7,15 +7,20 @@ export class MediaRepository {
   constructor(private _media: PrismaRepository<'media' | 'integration'>) {}
 
   async findOwnedPath(org: string, path: string) {
+    // Older uploaders appended a slash even when the configured base had one.
+    const paths = [path, path.replace(/\/([^/]+)$/, '//$1')];
+    if (process.env.CLOUDFLARE_BUCKET_URL) {
+      paths.push(process.env.CLOUDFLARE_BUCKET_URL + '/' + path.split('/').pop());
+    }
     const media = await this._media.model.media.findFirst({
-      where: { organizationId: org, OR: [{ path }, { thumbnail: path }], deletedAt: null },
+      where: { organizationId: org, OR: [{ path: { in: paths } }, { thumbnail: { in: paths } }], deletedAt: null },
       select: { id: true, path: true },
     });
     if (media) return media;
     // Provider avatars are uploaded directly and stored on Integration, rather
     // than in Media. Use the same organization/deletion checks for those files.
     const integration = await this._media.model.integration.findFirst({
-      where: { organizationId: org, picture: path, deletedAt: null },
+      where: { organizationId: org, picture: { in: paths }, deletedAt: null },
       select: { id: true, picture: true },
     });
     return integration ? { id: integration.id, path: integration.picture } : null;

@@ -16,7 +16,7 @@ export function privateMediaKey(value: string): string | undefined {
         `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`;
       bases.push(
         new URL(
-          endpoint.replace(/\/$/, '') + '/' + process.env.CLOUDFLARE_BUCKETNAME,
+          endpoint.replace(/\/+$/, '') + '/' + process.env.CLOUDFLARE_BUCKETNAME,
         ),
       );
       const virtualHost = new URL(endpoint);
@@ -27,11 +27,11 @@ export function privateMediaKey(value: string): string | undefined {
     const base = bases.find(
       (base) =>
         url.origin === base.origin &&
-        url.pathname.startsWith(base.pathname.replace(/\/$/, '') + '/'),
+        url.pathname.startsWith(base.pathname.replace(/\/+$/, '') + '/'),
     );
     if (!base) return;
-    const prefix = base.pathname.replace(/\/$/, '') + '/';
-    const key = decodeURIComponent(url.pathname.slice(prefix.length));
+    const prefix = base.pathname.replace(/\/+$/, '') + '/';
+    const key = decodeURIComponent(url.pathname.slice(prefix.length).replace(/^\/+/, ''));
     // Postiz generates flat filenames. Do not sign paths, encoded separators,
     // or user-supplied traversal sequences.
     if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(key)) return;
@@ -42,7 +42,7 @@ export function privateMediaKey(value: string): string | undefined {
 }
 
 export function canonicalMediaUrl(key: string): string {
-  return process.env.CLOUDFLARE_BUCKET_URL!.replace(/\/$/, '') + '/' + key;
+  return process.env.CLOUDFLARE_BUCKET_URL!.replace(/\/+$/, '') + '/' + key;
 }
 
 /** Includes JSON-encoded post attachments, but preserves dates and buffers. */

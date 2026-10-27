@@ -48,6 +48,7 @@ class CloudflareStorage implements IUploadProvider {
     private _uploadUrl: string,
     customEndpoint?: string
   ) {
+    if (privateMediaEnabled()) this._uploadUrl = this._uploadUrl.replace(/\/+$/, '');
     this._client = new S3Client({
       endpoint:
         customEndpoint || `https://${accountID}.r2.cloudflarestorage.com`,

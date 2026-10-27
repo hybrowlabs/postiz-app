@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import { TweetV2, TwitterApi } from 'twitter-api-v2';
 import { createHmac, randomBytes } from 'crypto';
 import { parseFragment } from 'parse5';
@@ -580,7 +581,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
   private async uploadVideoInChunks(client: TwitterApi, path: string) {
     const totalBytes = await this.mediaSize(path, this.identifier);
-    const mediaType = String(lookup(path) || 'video/mp4');
+    const mediaType = String(lookup(mediaFilePath(path)) || 'video/mp4');
 
     // twitter-api-v2 is not this.fetch, so these legs record their own
     // heartbeat details - otherwise a stall here reports only the generic
@@ -754,7 +755,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
                         )
                       : client.v2.uploadMedia(
                           await sharp(await this.readOrFetch(m.path), {
-                            animated: lookup(m.path) === 'image/gif',
+                            animated: lookup(mediaFilePath(m.path)) === 'image/gif',
                           })
                             .resize({
                               width: 1000,
@@ -762,7 +763,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
                             .gif()
                             .toBuffer(),
                           {
-                            media_type: (lookup(m.path) || '') as any,
+                            media_type: (lookup(mediaFilePath(m.path)) || '') as any,
                           }
                         )
                   ),

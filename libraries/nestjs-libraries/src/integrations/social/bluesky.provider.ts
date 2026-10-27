@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import { fetchMediaMetadata } from '@gitroom/nestjs-libraries/upload/media.metadata';
 import {
   AuthTokenDetails,
@@ -122,7 +123,7 @@ async function startVideoUpload(
     'https://video.bsky.app/xrpc/app.bsky.video.uploadVideo'
   );
   uploadUrl.searchParams.append('did', agent.session!.did);
-  uploadUrl.searchParams.append('name', videoPath.split('/').pop()!);
+  uploadUrl.searchParams.append('name', mediaFilePath(videoPath).split('/').pop()!);
 
   setHeartbeatDetails('bluesky: upload video');
   const uploadResponse = await fetch(uploadUrl, {

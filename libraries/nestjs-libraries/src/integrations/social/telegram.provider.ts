@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -154,7 +155,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
       }
       //get mime type to pass contentType to telegram api.
       //some photos and videos might not pass telegram api restrictions, so they are sent as documents instead of returning errors
-      const mimeType = mime.getType(mediaUrl); // Detect MIME type
+      const mimeType = mime.getType(mediaFilePath(mediaUrl)); // Detect MIME type
       let mediaType: 'photo' | 'video' | 'document';
 
       if (mimeType?.startsWith('image/')) {
@@ -169,7 +170,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
         type: mediaType,
         media: mediaUrl,
         fileOptions: {
-          filename: media.path.split('/').pop(),
+          filename: mediaFilePath(media.path).split('/').pop(),
           contentType: mimeType || 'application/octet-stream',
         },
       };

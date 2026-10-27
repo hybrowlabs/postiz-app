@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PendingCheckResponse,
@@ -657,7 +658,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   }
 
   private async prepareMediaBuffer(mediaUrl: string): Promise<Buffer> {
-    const isGif = lookup(mediaUrl) === 'image/gif';
+    const isGif = lookup(mediaFilePath(mediaUrl)) === 'image/gif';
 
     // GIFs pass through untouched (sharp would break animation). Videos never
     // reach this function - they are streamed by uploadPicture instead.
@@ -667,7 +668,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       return Buffer.from(await this.readOrFetch(mediaUrl));
     }
 
-    const mime = lookup(mediaUrl);
+    const mime = lookup(mediaFilePath(mediaUrl));
     // PNG and JPEG (covers both .jpg and .jpeg) keep their original format;
     // anything else (webp, tiff, ...) is converted to jpeg for compatibility.
     const keepFormat = mime === 'image/png' || mime === 'image/jpeg';

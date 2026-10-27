@@ -1,3 +1,4 @@
+import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -183,7 +184,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
           responseType: 'stream',
         });
 
-        const slash = media.path.split('/').at(-1);
+        const slash = mediaFilePath(media.path).split('/').at(-1);
 
         const formData = new FormDataNew();
         formData.append('photo', data, {

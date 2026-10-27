@@ -242,7 +242,10 @@ export class PostActivity {
                 !/<\/?[a-z][\s\S]*>/i.test(p.content),
                 getIntegration.mentionFormat,
               ),
-              settings: JSON.parse(p.settings || '{}'),
+              settings: await this._postService.resolvePublishingSettings(
+          integration.organizationId,
+          p.settings,
+        ),
               media: await this._postService.updateMedia(
                 p.id,
                 JSON.parse(p.image || '[]'),
@@ -364,7 +367,10 @@ export class PostActivity {
           !/<\/?[a-z][\s\S]*>/i.test(p.content),
           getIntegration.mentionFormat,
         ),
-        settings: JSON.parse(p.settings || '{}'),
+        settings: await this._postService.resolvePublishingSettings(
+          integration.organizationId,
+          p.settings,
+        ),
         media: await this._postService.updateMedia(
           p.id,
           JSON.parse(p.image || '[]'),
@@ -412,7 +418,7 @@ export class PostActivity {
       /**empty**/
     }
 
-    return postNow;
+    return this._postService.persistPublishingData(postNow);
   }
 
   @ActivityMethod()
@@ -421,8 +427,17 @@ export class PostActivity {
       integration.providerIdentifier
     );
 
-    return this.handleDisconnect(integration, () =>
-      getIntegration.checkPostStatus(integration.token, pendingData, integration)
+    return this.handleDisconnect(integration, async () =>
+      this._postService.persistPublishingData(
+        await getIntegration.checkPostStatus(
+          integration.token,
+          await this._postService.resolvePublishingData(
+            integration.organizationId,
+            pendingData,
+          ),
+          integration,
+        ),
+      ),
     );
   }
 
@@ -433,8 +448,17 @@ export class PostActivity {
     );
 
     return withHeartbeat(() =>
-      this.handleDisconnect(integration, () =>
-        getIntegration.finalizePost(integration.token, pendingData, integration)
+      this.handleDisconnect(integration, async () =>
+        this._postService.persistPublishingData(
+          await getIntegration.finalizePost(
+            integration.token,
+            await this._postService.resolvePublishingData(
+            integration.organizationId,
+            pendingData,
+          ),
+            integration,
+          ),
+        ),
       )
     );
   }

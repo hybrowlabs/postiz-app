@@ -211,7 +211,11 @@ are marked `private, no-store`. Signed links are bearer capabilities until expir
 do not share them. Existing bucket URLs do not need a database migration.
 
 Post attachments retain canonical URLs in storage. The publishing activity issues
-fresh three-hour signed URLs immediately before handing media to a social provider.
+fresh three-hour signed URLs immediately before handing media to a social provider,
+including thumbnails and cover images in provider settings. Pending upload results
+retain canonical references; polling and finalization re-authorize and re-sign media
+for every retry. Integration avatars use the owning active integration record for
+authorization when no Media row exists.
 API-key/OAuth API responses use 15-minute signed URLs. Public reads are not
 required. New uploads omit public ACLs; this option does not revoke ACLs or bucket
 policies previously granted outside Postiz.

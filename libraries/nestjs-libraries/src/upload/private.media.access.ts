@@ -108,6 +108,13 @@ export class PrivateMediaAccess {
     });
   }
 
+  /** Provider results can contain the temporary input URLs. Keep workflow
+   * history/pending data canonical so retries can authorize and sign again. */
+  async persistable<T>(value: T): Promise<T> {
+    if (!privateMediaEnabled()) return value;
+    return mapMediaUrls(value, async (_url, key) => canonicalMediaUrl(key));
+  }
+
   /** Called immediately before a provider fetches media, never at scheduling time. */
   async forPublishing<T>(org: string, value: T): Promise<T> {
     if (!privateMediaEnabled()) return value;

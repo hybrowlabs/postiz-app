@@ -104,6 +104,26 @@ describe('private media access', () => {
     );
   });
 
+  it('refreshes nested publishing settings without changing the saved settings', async () => {
+    const settings = { thumbnail: { path }, nested: { cover: path } };
+    storage.signDownloadUrl.mockResolvedValueOnce('fresh-thumbnail').mockResolvedValueOnce('fresh-cover');
+    expect(await access.forPublishing('owner', settings)).toEqual({
+      thumbnail: { path: 'fresh-thumbnail' }, nested: { cover: 'fresh-cover' },
+    });
+    expect(settings).toEqual({ thumbnail: { path }, nested: { cover: path } });
+    await expect(access.forPublishing('other', settings)).rejects.toThrow('Media does not belong');
+  });
+
+  it('removes signatures from pending results and renews them for later retries', async () => {
+    const pending = { status: 'pending', pendingData: { path: path + '?X-Amz-Signature=old', thumbnail: path + '?X-Amz-Signature=old' } };
+    const persisted = await access.persistable(pending);
+    expect(persisted.pendingData).toEqual({ path, thumbnail: path });
+    storage.signDownloadUrl.mockResolvedValue('fresh-retry');
+    expect(await access.forPublishing('owner', persisted.pendingData)).toEqual({ path: 'fresh-retry', thumbnail: 'fresh-retry' });
+    expect(persisted.pendingData.path).toBe(path);
+    await expect(access.forPublishing('other', persisted.pendingData)).rejects.toThrow('Media does not belong');
+  });
+
   it('fails closed when signing fails', async () => {
     storage.signDownloadUrl.mockRejectedValue(new Error('storage unavailable'));
     await expect(access.forPublishing('owner', [{ path }])).rejects.toThrow(

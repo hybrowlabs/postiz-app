@@ -382,6 +382,21 @@ export class PostsService {
     );
   }
 
+  async resolvePublishingData<T>(org: string, value: T): Promise<T> {
+    return this._mediaService.privateMedia.forPublishing(org, value);
+  }
+
+  async persistPublishingData<T>(value: T): Promise<T> {
+    return this._mediaService.privateMedia.persistable(value);
+  }
+
+  async resolvePublishingSettings(org: string, settings: string | null) {
+    return this._mediaService.privateMedia.forPublishing(
+      org,
+      JSON.parse(settings || '{}'),
+    );
+  }
+
   async updateMedia(
     id: string,
     imagesList: any[],

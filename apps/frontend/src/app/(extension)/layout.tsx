@@ -53,6 +53,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           isChatBase={false}
           disableImageCompression={!!process.env.DISABLE_IMAGE_COMPRESSION}
           disableXAnalytics={!!process.env.DISABLE_X_ANALYTICS}
+          linkedinMemberAnalytics={!!process.env.LINKEDIN_MEMBER_POST_ANALYTICS}
           sentryDsn={process.env.NEXT_PUBLIC_SENTRY_DSN!}
           extensionId={process.env.EXTENSION_ID || ''}
           mediaProcessing={

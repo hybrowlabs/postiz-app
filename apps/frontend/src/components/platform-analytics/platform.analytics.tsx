@@ -34,7 +34,14 @@ export const PlatformAnalytics = () => {
   const fetch = useFetch();
   const t = useT();
   const router = useRouter();
-  const { disableXAnalytics } = useVariables();
+  const { disableXAnalytics, linkedinMemberAnalytics } = useVariables();
+  const supportedIntegrations = useMemo(
+    () =>
+      linkedinMemberAnalytics
+        ? [...allowedIntegrations, 'linkedin']
+        : allowedIntegrations,
+    [linkedinMemberAnalytics]
+  );
 
   const [current, setCurrent] = useState(0);
   const [key, setKey] = useState(7);
@@ -50,8 +57,10 @@ export const PlatformAnalytics = () => {
       }
       return true;
     });
-    return int.filter((f: any) => allowedIntegrations.includes(f.identifier));
-  }, []);
+    return int.filter((f: { identifier: string }) =>
+      supportedIntegrations.includes(f.identifier)
+    );
+  }, [disableXAnalytics, supportedIntegrations]);
   const { data, isLoading } = useSWR('analytics-list', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -76,7 +85,11 @@ export const PlatformAnalytics = () => {
       return [];
     }
     const arr = [];
+    // Personal LinkedIn (member) analytics is opt-in per instance and supports every range.
+    const linkedinMember =
+      linkedinMemberAnalytics && currentIntegration.identifier === 'linkedin';
     if (
+      linkedinMember ||
       [
         'facebook',
         'instagram',
@@ -97,6 +110,7 @@ export const PlatformAnalytics = () => {
       });
     }
     if (
+      linkedinMember ||
       [
         'facebook',
         'instagram',
@@ -117,6 +131,7 @@ export const PlatformAnalytics = () => {
       });
     }
     if (
+      linkedinMember ||
       ['facebook', 'linkedin-page', 'pinterest', 'youtube', 'x', 'gmb'].indexOf(
         currentIntegration.identifier
       ) !== -1
@@ -127,7 +142,7 @@ export const PlatformAnalytics = () => {
       });
     }
     return arr;
-  }, [currentIntegration]);
+  }, [currentIntegration, linkedinMemberAnalytics]);
   const keys = useMemo(() => {
     if (!currentIntegration) {
       return 7;
@@ -162,7 +177,7 @@ export const PlatformAnalytics = () => {
         </div>
         <div className="text-[20px]">
           {t('supported', 'Supported:')}
-          {allowedIntegrations.map((p) => capitalize(p)).join(', ')}
+          {supportedIntegrations.map((p) => capitalize(p)).join(', ')}
         </div>
         <Button onClick={() => router.push('/launches')}>
           {t(

@@ -26,6 +26,7 @@ interface VariableContextInterface {
   isSecured: boolean;
   disableImageCompression: boolean;
   disableXAnalytics: boolean;
+  linkedinMemberAnalytics: boolean;
   language: string;
   dub: boolean;
   transloadit: string[];
@@ -62,6 +63,7 @@ const VariableContext = createContext({
   appleClientId: '',
   disableImageCompression: false,
   disableXAnalytics: false,
+  linkedinMemberAnalytics: false,
   language: '',
   dub: false,
   transloadit: [],

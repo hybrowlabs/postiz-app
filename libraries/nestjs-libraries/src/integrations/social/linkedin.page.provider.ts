@@ -317,7 +317,7 @@ export class LinkedinPageProvider
     );
   }
 
-  async analytics(
+  override async analytics(
     id: string,
     accessToken: string,
     date: number
@@ -442,7 +442,7 @@ export class LinkedinPageProvider
     }));
   }
 
-  async postAnalytics(
+  override async postAnalytics(
     integrationId: string,
     accessToken: string,
     postId: string,

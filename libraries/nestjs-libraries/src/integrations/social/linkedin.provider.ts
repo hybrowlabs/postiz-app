@@ -1,5 +1,6 @@
 import { mediaFilePath } from '@gitroom/nestjs-libraries/upload/media.file.path';
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PendingCheckResponse,
   PostDetails,
@@ -24,6 +25,7 @@ import { LinkedinDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import imageToPDF from 'image-to-pdf';
 import { Readable } from 'stream';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import dayjs from 'dayjs';
 
 // Travels through the workflow history between postPending, checkPostStatus
 // and finalizePost - keep it small JSON (media urns and the post content, never
@@ -53,6 +55,52 @@ type LinkedinPendingData = {
   confirmed?: boolean;
 };
 
+// Member (personal profile) analytics need Community Management API approval.
+// LinkedIn rejects the whole OAuth flow when an unapproved scope is requested,
+// so each scope - and the analytics it unlocks - is opt-in through env.
+const memberPostAnalyticsEnabled = () =>
+  process.env.LINKEDIN_MEMBER_POST_ANALYTICS === 'true';
+// Followers only ride along with post analytics.
+const memberProfileAnalyticsEnabled = () =>
+  memberPostAnalyticsEnabled() &&
+  process.env.LINKEDIN_MEMBER_PROFILE_ANALYTICS === 'true';
+
+const MEMBER_ANALYTICS_VERSION = '202609';
+
+type LinkedinDate = { day: number; month: number; year: number };
+// Only count/dateRange are read: metricType is a plain string from 202605 on
+// but a wrapped object in older versions.
+type MemberAnalyticsElement = {
+  count?: number;
+  memberFollowersCount?: number;
+  dateRange?: { start: LinkedinDate; end: LinkedinDate };
+};
+// Numeric totals: the platform analytics chart sums points with `+`.
+type MemberSeries = {
+  label: string;
+  data: { total: number; date: string }[];
+  percentageChange: number;
+};
+
+const toLinkedinDate = (d: dayjs.Dayjs) =>
+  `(day:${d.date()},month:${d.month() + 1},year:${d.year()})`;
+
+const fromLinkedinDate = ({ year, month, day }: LinkedinDate) =>
+  `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+// Second half of the series against the first half, as a rounded percentage.
+const halfOverHalfChange = (data: { total: number }[]) => {
+  const half = Math.floor(data.length / 2);
+  const sum = (points: { total: number }[]) =>
+    points.reduce((acc, p) => acc + p.total, 0);
+  const first = sum(data.slice(0, half));
+  const second = sum(data.slice(data.length - half));
+  if (!half || !first) {
+    return 0;
+  }
+  return Math.round(((second - first) / first) * 100);
+};
+
 @Rules(
   'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
 )
@@ -63,8 +111,15 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
   isBetweenSteps = false;
   // Personal publishing only needs the self-service OpenID and Share products.
-  // Organization permissions belong to LinkedinPageProvider.
-  scopes = ['openid', 'profile', 'w_member_social'];
+  // Organization permissions belong to LinkedinPageProvider; member analytics
+  // scopes are opt-in (see memberPostAnalyticsEnabled).
+  scopes = [
+    'openid',
+    'profile',
+    'w_member_social',
+    ...(memberPostAnalyticsEnabled() ? ['r_member_postAnalytics'] : []),
+    ...(memberProfileAnalyticsEnabled() ? ['r_member_profileAnalytics'] : []),
+  ];
   override maxConcurrentJob = 2;
   refreshWait = true;
   editor = 'normal' as const;
@@ -1109,6 +1164,161 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     );
 
     return [this.createPostResponse(commentPostId, commentPost.id, false)];
+  }
+
+  private async memberAnalyticsElements(
+    accessToken: string,
+    path: string
+  ): Promise<MemberAnalyticsElement[]> {
+    const { elements } = await (
+      await this.fetch(`https://api.linkedin.com/rest/${path}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': MEMBER_ANALYTICS_VERSION,
+        },
+      })
+    ).json();
+    return elements || [];
+  }
+
+  // One failing metric (e.g. a token connected before a scope was enabled)
+  // drops only its own series. RefreshToken still propagates so the caller's
+  // refresh-and-retry path runs.
+  private async settledSeries<T>(requests: (() => Promise<T>)[]) {
+    const results = await Promise.allSettled(
+      requests.map((request) => request())
+    );
+    const refresh = results.find(
+      (r) => r.status === 'rejected' && r.reason instanceof RefreshToken
+    ) as PromiseRejectedResult | undefined;
+    if (refresh) {
+      throw refresh.reason;
+    }
+    return results
+      .filter((r): r is PromiseFulfilledResult<Awaited<T>> => r.status === 'fulfilled')
+      .map((r) => r.value);
+  }
+
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    if (!memberPostAnalyticsEnabled()) {
+      return [];
+    }
+
+    // Start inclusive, end exclusive - tomorrow so today is included.
+    const dateRange = `(start:${toLinkedinDate(
+      dayjs().subtract(date, 'day')
+    )},end:${toLinkedinDate(dayjs().add(1, 'day'))})`;
+    const today = dayjs().format('YYYY-MM-DD');
+
+    const daily = (label: string, metric: string) => async () => ({
+      label,
+      data: (
+        await this.memberAnalyticsElements(
+          accessToken,
+          `memberCreatorPostAnalytics?q=me&queryType=${metric}&aggregation=DAILY&dateRange=${dateRange}`
+        )
+      )
+        .filter((e) => e.dateRange)
+        .map((e) => ({
+          total: e.count ?? 0,
+          date: fromLinkedinDate(e.dateRange!.start),
+        })),
+    });
+
+    // At most 6 calls: the dev tier allows 100 calls per member per day.
+    const requests = [
+      daily('Impressions', 'IMPRESSION'),
+      // DAILY is not supported for MEMBERS_REACHED.
+      async () => {
+        const [total] = await this.memberAnalyticsElements(
+          accessToken,
+          `memberCreatorPostAnalytics?q=me&queryType=MEMBERS_REACHED&aggregation=TOTAL&dateRange=${dateRange}`
+        );
+        return {
+          label: 'Members Reached',
+          data: [{ total: total?.count ?? 0, date: today }],
+        };
+      },
+      daily('Reactions', 'REACTION'),
+      daily('Comments', 'COMMENT'),
+      daily('Reshares', 'RESHARE'),
+      ...(memberProfileAnalyticsEnabled()
+        ? [
+            async () => ({
+              label: 'Followers',
+              data: (
+                await this.memberAnalyticsElements(
+                  accessToken,
+                  `memberFollowersCount?q=dateRange&dateRange=${dateRange}`
+                )
+              )
+                .filter((e) => e.dateRange)
+                .map((e) => ({
+                  total: e.memberFollowersCount ?? 0,
+                  date: fromLinkedinDate(e.dateRange!.start),
+                })),
+            }),
+          ]
+        : []),
+    ];
+
+    const series: MemberSeries[] = (await this.settledSeries(requests)).map(
+      (s) => ({ ...s, percentageChange: halfOverHalfChange(s.data) })
+    );
+
+    return series as unknown as AnalyticsData[];
+  }
+
+  async postAnalytics(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    if (!memberPostAnalyticsEnabled()) {
+      return [];
+    }
+
+    // postId is the x-restli-id from createMainPost.
+    const entityKey = postId.startsWith('urn:li:share:')
+      ? 'share'
+      : postId.startsWith('urn:li:ugcPost:')
+      ? 'ugc'
+      : undefined;
+    if (!entityKey) {
+      return [];
+    }
+
+    const entity = `(${entityKey}:${encodeURIComponent(postId)})`;
+    const today = dayjs().format('YYYY-MM-DD');
+    const metrics = [
+      ['Impressions', 'IMPRESSION'],
+      ['Members Reached', 'MEMBERS_REACHED'],
+      ['Reactions', 'REACTION'],
+      ['Comments', 'COMMENT'],
+      ['Reshares', 'RESHARE'],
+      ['Link Clicks', 'LINK_CLICKS'],
+    ];
+
+    // Lifetime totals: no dateRange.
+    return this.settledSeries(
+      metrics.map(([label, metric]) => async () => {
+        const [total] = await this.memberAnalyticsElements(
+          accessToken,
+          `memberCreatorPostAnalytics?q=entity&entity=${entity}&queryType=${metric}&aggregation=TOTAL`
+        );
+        return {
+          label,
+          percentageChange: 0,
+          data: [{ total: String(total?.count ?? 0), date: today }],
+        };
+      })
+    );
   }
 
   @PostPlug({
